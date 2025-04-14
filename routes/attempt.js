@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const attemptController = require('../controllers/AttemptController');
+const attemptController = require('../controllers/AttemptControllers');
 const authMiddleware = require('../middleware/authMiddleware'); // Assuming you have an auth middleware
 
 // Middleware to protect student routes
