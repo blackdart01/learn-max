@@ -21,7 +21,7 @@ mongoose.connect(uri)
 // Use the routes with a base path
 app.use('/api/auth', authRoutes);
 app.use('/api/teachers', questionRoutes);
-app.use('/api/teachers', testRoutes);
+app.use('/api/test', testRoutes);
 app.use('/api', attemptRoutes); // Note the /api prefix here
 app.use('/api/teachers', teacherRoutes); // Note the /api prefix here
 
