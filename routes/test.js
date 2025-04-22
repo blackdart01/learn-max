@@ -17,6 +17,8 @@ router.use(authMiddleware.authenticate);
 router.use(requireTeacher);
 
 router.get('/tests', testController.getAllTestsByTeacher);
+router.get('/tests/new', testController.getAllTestsByTeacherNew);
+router.get('/tests/testGist', testController.getTestGist);
 router.post('/tests', testController.createTest);
 router.get('/tests/:id', testController.getTestByIdForTeacher);
 router.put('/tests/:id', testController.updateTest);
