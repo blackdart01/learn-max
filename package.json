@@ -19,6 +19,8 @@
     "mongoose": "^8.13.2",
     "multer": "^1.4.5-lts.2",
     "nodemon": "^3.1.9",
-    "openssl": "^2.0.0"
+    "openssl": "^2.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   }
 }

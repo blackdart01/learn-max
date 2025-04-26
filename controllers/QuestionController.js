@@ -85,7 +85,15 @@ exports.getQuestionById = async (req, res) => {
 // @access  Private (Teachers only)
 exports.updateQuestion = async (req, res) => {
     try {
-        const { questionText, questionType, options, correctAnswer, timeLimit, imageLink, answerExplanation, subject, isActive } = req.body;
+        let { questionText, questionType, options, correctAnswer, timeLimit, imageLink, answerExplanation, subject, isActive } = req.body;
+        console.log("questionType -> ", questionType);
+        if (questionType.toLowerCase() == "fill-in-the-blank"){
+            console.log("inside");
+            
+            if (options!=null)
+                options=[];
+        }
+        console.log("options -> ", options);
         const updatedQuestion = await QuestionModel.findOneAndUpdate(
             { _id: req.params.id, createdBy: req.user.id },
             { questionText, questionType, options, correctAnswer, timeLimit, imageLink, answerExplanation, subject, isActive},

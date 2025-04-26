@@ -21,9 +21,12 @@ router.get('/tests/new', testController.getAllTestsByTeacherNew);
 router.get('/tests/testGist', testController.getTestGist);
 router.post('/tests', testController.createTest);
 router.get('/tests/:id', testController.getTestByIdForTeacher);
+router.get('/tests/:id/complete', testController.getQuestionDetailsByTestId);
 router.put('/tests/:id', testController.updateTest);
 router.delete('/tests/:id', testController.deleteTest);
 router.post('/tests/:testId/add-question', testController.addQuestionToTest);
+router.post('/tests/:testId/add-multiple-question', testController.addMultipleQuestionToTest);
+router.post('/tests/:questionId/add-question-to-multiple-test', testController.addQuestionToMultipleTest);
 router.post('/tests/:testId/remove-question', testController.removeQuestionFromTest);
 
 module.exports = router;

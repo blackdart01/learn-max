@@ -5,7 +5,7 @@ const questionSchema = new mongoose.Schema({
     questionText: { type: String, required: true },
     questionType: { type: String, default: 'Multiple Choice' },
     options: [String], // Array of options
-    correctAnswer: String, // The correct option text
+    correctAnswer: [String], // The correct option text
     timeLimit: { type: Number, default: 30 }, // Time limit in seconds
     imageLink: String, // URL to an image for the question
     answerExplanation: String, // Explanation for the correct answer

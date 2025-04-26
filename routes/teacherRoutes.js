@@ -4,7 +4,7 @@ const path = require('path');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { authenticate } = require('../middleware/authMiddleware');
-const Question = require('../models/QuestionModel'); // Assuming you have a Question model
+const QuestionModel = require('../models/QuestionModel'); // Assuming you have a Question model
 const questionController = require('../controllers/QuestionController')
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware'); // Assuming you have an auth middleware
@@ -88,7 +88,7 @@ router.post('/questions/upload-csv', authenticate, upload.single('questions'), a
                 }
 
                 // Create the questions in the database
-                const createdQuestions = await Question.insertMany(questionsToCreate);
+                const createdQuestions = await QuestionModel.insertMany(questionsToCreate);
 
                 res.status(201).json({ message: `${createdQuestions.length} questions uploaded successfully.`, data: createdQuestions });
 
