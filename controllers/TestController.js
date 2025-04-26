@@ -239,7 +239,10 @@ exports.addMultipleQuestionToTest = async (req, res) => {
         if (!test) {
             return res.status(404).json({ message: 'Test not found or you are not the creator' });
         }
-
+        // Check if the question is already present in the test's questions array
+        if (test.questions.includes(questionId)) {
+            return res.status(409).json({ message: 'Question already present in the Test' });
+        }
         // Check for duplicate questions *before* updating
         const existingQuestionIds = new Set(test.questions.map(q => q.toString())); // Convert ObjectIds to strings for comparison
         const newQuestionsToAdd = validQuestionIds.filter(qId => !existingQuestionIds.has(qId.toString()));
@@ -336,6 +339,10 @@ exports.addQuestionToMultipleTest = async (req, res) => {
             const test = await Test.findOne({ _id: testId, teacherId });
             if (!test) {
                 return res.status(404).json({ message: `Test not found or not owned by teacher: ${testId}` });
+            }
+            // Check if the question is already present in the test's questions array
+            if (test.questions.includes(questionId)) {
+                return res.status(409).json({ message: 'Question already present in the Test' });
             }
             // Only add the testId to the array if it passes validation
             testsToUpdate.push(testId);
