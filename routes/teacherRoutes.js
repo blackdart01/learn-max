@@ -8,95 +8,223 @@ const QuestionModel = require('../models/QuestionModel'); // Assuming you have a
 const questionController = require('../controllers/QuestionController')
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware'); // Assuming you have an auth middleware
+const { v4: uuidv4 } = require('uuid'); // For generating unique filenames
 
 // Middleware to handle file uploads (using multer)
+const isExcelFile = (file) => {
+    return ['.xls', '.xlsx'].includes(path.extname(file.originalname).toLowerCase());
+};
+
+// Utility function to check if a file is a CSV file
+const isCsvFile = (file) => {
+    return ['.csv'].includes(path.extname(file.originalname).toLowerCase());
+};
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         console.log("req->", __dirname);
-        
         cb(null, path.join(__dirname, '../uploads')); // Store uploaded files in the 'uploads' directory
     },
     filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const uniqueSuffix = uuidv4(); // Use uuid for unique filenames
         cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        if (isExcelFile(file) || isCsvFile(file)) {
+            console.log("is excel or csv");
+            cb(null, true);
+        } else {
+            console.log("neither excel or csv");
+            cb(null, false); // Reject the file
+        }
+    }
+});
 
-// @desc    Upload CSV file to create multiple questions
+// @desc    Upload Excel/CSV file to create multiple questions
 // @route   POST /api/teachers/questions/upload-csv
 // @access  Protected (Teachers only)
 router.post('/questions/upload-csv', authenticate, upload.single('questions'), async (req, res) => {
-    // console.log("path :", req.file); // Log file info
     if (!req.file) {
-        return res.status(400).json({ message: 'Please upload a CSV file named "questions"' });
+        return res.status(400).json({ message: 'Please upload an Excel or CSV file named "questions"' });
     }
+
     console.log("Uploaded file details:", req.file);
-    const results = [];
-    const filePath = req.file.path;
-    console.log("File path for reading:", filePath);
 
-    fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', (data) => {
-            console.log("data ->", JSON.stringify(data));
-            
-            results.push(data);
-        })
-        .on('end', async () => {
-            fs.unlinkSync(filePath);
-            
-            try {
-                const questionsToCreate = results.map(row => {
-                    const options = [];
-                    for (let i = 1; i <= 5; i++) {
-                        // console.log(`option ${i}`, row[i]);
-                        
-                        if (row[`Option ${i}`] !== undefined && row[`Option ${i}`].trim() !== '') {
-                            options.push(row[`Option ${i}`].trim());
-                        }
-                    }
+    let csvFilePath = req.file.path; // Start with the uploaded file path
 
-                    let correctAnswer = null;
-                    if (row['Correct Answer'] && !isNaN(parseInt(row['Correct Answer']))) {
-                        const correctIndex = parseInt(row['Correct Answer']) - 1;
-                        if (correctIndex >= 0 && correctIndex < options.length) {
-                            correctAnswer = options[correctIndex];
-                        }
-                    }
-                    let isActiveValue = row['Is Active'] ? row['Is Active'].trim().toLowerCase() : 'yes'; // Default to yes if not provided or empty
-                    let isActive = isActiveValue === 'yes' || isActiveValue === 'true';
-                    return {
-                        questionText: row['Question Text'] ? row['Question Text'].trim() : '',
-                        questionType: row['Question Type'] ? row['Question Type'].trim() : 'Multiple Choice',
-                        options: options,
-                        correctAnswer: correctAnswer,
-                        subject: row['Subject'] ? row['Subject'].trim() : undefined,
-                        isActive: isActive,
-                        timeLimit: row['Time in seconds'] && !isNaN(parseInt(row['Time in seconds']))? parseInt(row['Time in seconds']): 30, 
-                        imageLink: row['Image Link'] ? row['Image Link'].trim() : '',
-                        answerExplanation: row['Answer explanation'] ? row['Answer explanation'].trim() : '',
-                        createdBy: req.user.id, // Assuming authenticate middleware adds user info
-                    };
+    try {
+        if (isExcelFile(req.file)) {
+            // 1. Convert Excel to CSV using the Java program
+            const excelFilePath = req.file.path;
+            const csvFileName = `temp-${uuidv4()}.csv`;
+            csvFilePath = path.join(__dirname, '../uploads', csvFileName); //create a unique name
+
+            const javaProcess = spawn('java', [
+                '-classpath',  // Classpath for Apache POI and any dependencies
+                './*',       //  Assuming your compiled Java class and POI are in the current dir
+                'ExcelToCsvConverter',  // Main class name
+                excelFilePath,      // Argument 1: Excel file path
+                csvFilePath       // Argument 2: CSV file path
+            ]);
+
+            // Capture the output and error streams
+            let javaOutput = '';
+            let javaError = '';
+
+            javaProcess.stdout.on('data', (data) => {
+                javaOutput += data.toString();
+            });
+
+            javaProcess.stderr.on('data', (data) => {
+                javaError += data.toString();
+            });
+
+            // Wait for the Java process to complete
+            const exitCode = await new Promise((resolve) => {
+                javaProcess.on('close', (code) => {
+                    resolve(code);
                 });
-                
-                // Validate required fields (you might want more robust validation)
-                const invalidQuestions = questionsToCreate.filter(q => !q.questionText);
-                if (invalidQuestions.length > 0) {
-                    return res.status(400).json({ message: 'CSV contains questions with missing Question Text.' });
+            });
+
+            if (exitCode !== 0) {
+                // Handle errors from the Java conversion process
+                console.error(`Java process exited with code ${exitCode}`);
+                console.error('Java Output:', javaOutput);
+                console.error('Java Error:', javaError);
+                return res.status(500).json({
+                    message: 'Error converting Excel to CSV',
+                    error: javaError || 'Conversion failed',
+                });
+            }
+
+            console.log('Excel to CSV conversion successful. CSV file: ', csvFilePath);
+            // Optionally log the Java output
+            console.log('Java Output:', javaOutput);
+
+        }
+        // 2. Process the CSV file (either the original or the converted one)
+        //    -  The 'csvFilePath' variable now holds the correct path to the CSV file
+        const questions = [];
+        const csvData = fs.readFileSync(csvFilePath, 'utf-8');
+        const lines = csvData.trim().split('\n');
+
+        // 2.1 Parse the header row to get column names
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, '')); // to lower case and remove quotes for consistency
+
+        // 2.2 Define the expected columns and their corresponding properties
+        const expectedColumns = {
+            'subject': 'subject',
+            'question text': 'questionText',
+            'question type': 'questionType',
+            'option 1': 'option1',
+            'option 2': 'option2',
+            'option 3': 'option3',
+            'option 4': 'option4',
+            'option 5': 'option5', //make it dynamic
+            'correct answer': 'correctAnswer',
+            'answer explanation': 'answerExplanation',
+            'time in seconds': 'timeInSeconds',
+            'image link': 'imageLink',
+            'is active': 'isActive'
+        };
+
+        // Parse each line of the CSV, handling potential errors
+        for (let i = 1; i < lines.length; i++) { // Start from the second row (index 1)
+            try {
+                const line = lines[i].trim();
+                if (!line) continue; // Skip empty lines
+
+                const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, '')); // Remove quotes
+
+                //check if number of values matches the number of headers
+                if (values.length !== headers.length) {
+                    console.warn(`Skipping line ${i + 1}: Number of values does not match number of headers`);
+                    continue;
+                }
+                const questionData = {}; // Use 'any' to avoid TypeScript errors
+
+                // Iterate through the values and assign them to the corresponding properties based on the headers
+                for (let j = 0; j < headers.length; j++) {
+                    const header = headers[j];
+                    const value = values[j];
+
+                    if (expectedColumns[header]) {
+                        if (header === 'is active') {
+                            questionData[expectedColumns[header]] = value === 'TRUE';
+                        } else if (header === 'timeinseconds') {
+                            questionData[expectedColumns[header]] = parseInt(value, 10) || 60;
+                        }
+                        else {
+                            questionData[expectedColumns[header]] = value;
+                        }
+                    }
+                    // Handle additional options dynamically
+                    else if (header.startsWith('option ')) {
+                        if (!questionData.options) {
+                            questionData.options = [];
+                        }
+                        questionData.options.push(value);
+                    }
                 }
 
-                // Create the questions in the database
-                const createdQuestions = await QuestionModel.insertMany(questionsToCreate);
-
-                res.status(201).json({ message: `${createdQuestions.length} questions uploaded successfully.`, data: createdQuestions });
-
-            } catch (error) {
-                console.error('Error processing CSV:', error);
-                res.status(500).json({ message: 'Error processing CSV file.' });
+                // Basic validation: Check for the required fields
+                if (!questionData.questionText || !questionData.correctAnswer) {
+                    console.warn(`Skipping line ${i + 1}: Missing required fields (questionText, correctAnswer)`);
+                    continue; // Skip malformed lines
+                }
+                const finalOptions = [];
+                for (let k = 1; k <= 5; k++) {
+                    const optionKey = `option${k}`;
+                    if (questionData[optionKey]) {
+                        finalOptions.push(questionData[optionKey])
+                    }
+                }
+                questions.push({
+                    isActive: questionData.isActive,
+                    subject: questionData.subject,
+                    questionText: questionData.questionText,
+                    questionType: questionData.questionType,
+                    options: finalOptions, // Ensure options is always an array
+                    correctAnswer: questionData.correctAnswer,
+                    answerExplanation: questionData.answerExplanation || '',
+                    timeInSeconds: questionData.timeInSeconds || 60,
+                    imageLink: questionData.imageLink || '',
+                    createdBy: req.user.id, // Assuming you have user info in req.user
+                });
+            } catch (e) {
+                console.error(`Error parsing line ${i + 1}:`, e.message);
+                // Consider if you want to stop processing or continue with other lines
+                //  For now, we continue to the next line.
             }
+        }
+
+        if (questions.length === 0) {
+            return res.status(400).json({ message: 'No valid questions found in the uploaded file' });
+        }
+
+        // 3. Create questions in the database
+        const createdQuestions = await QuestionModel.insertMany(questions);
+
+        res.status(201).json({
+            message: 'Questions uploaded successfully',
+            count: createdQuestions.length,
+            data: createdQuestions,
         });
+    } catch (error) {
+        // Handle any errors that occurred during file processing, database operations, etc.
+        console.error("Error processing file:", error);
+        res.status(500).json({ message: 'Failed to upload questions', error: error.message });
+    } finally {
+        // Clean up: Delete the temporary CSV file (if created)
+        if (isExcelFile(req.file) && fs.existsSync(csvFilePath)) {
+            fs.unlinkSync(csvFilePath);
+            console.log('Deleted temporary CSV file:', csvFilePath);
+        }
+    }
 });
 const requireTeacher = (req, res, next) => {
     if (req.user && req.user.role === 'teacher') {

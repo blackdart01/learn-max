@@ -79,6 +79,22 @@ exports.getQuestionById = async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch question' });
     }
 };
+exports.updateActiveNessOfQuestion = async (req, res) => {
+    try {
+        const question = await QuestionModel.findOne({ _id: req.params.id, createdBy: req.user.id });
+        let updatedQuestion = null;
+        if (!question) {
+            return res.status(404).json({ message: 'Question not found' });
+        } else {
+            question.isActive = req.params.value;
+            updatedQuestion = await QuestionModel.findByIdAndUpdate({ _id: req.params.id, createdBy: req.user.id }, { question });
+        }
+        res.status(200).json(updatedQuestion);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to fetch question' });
+    }
+};
 
 // @desc    Update a specific question by ID
 // @route   PUT /api/teachers/questions/:id

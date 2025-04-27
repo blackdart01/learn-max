@@ -19,6 +19,7 @@ router.use(requireTeacher);
 router.get('/questions', questionController.getAllQuestions);
 router.post('/questions', questionController.addQuestion);
 router.get('/questions/:id', questionController.getQuestionById);
+router.put('/questions/:id/:value', questionController.updateActiveNessOfQuestion);
 router.put('/questions/:id', questionController.updateQuestion);
 router.delete('/questions/:id', questionController.deleteQuestion);
 
