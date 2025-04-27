@@ -21,6 +21,7 @@
     "nodemon": "^3.1.9",
     "openssl": "^2.0.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^11.1.0"
   }
 }
