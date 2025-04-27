@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const questionSchema = new mongoose.Schema({
     questionText: { type: String, required: true },
-    questionType: { type: String, default: 'Multiple Choice' },
+    questionType: { type: String, default: 'MCQ' },
     options: [String], // Array of options
     correctAnswer: [String], // The correct option text
     timeLimit: { type: Number, default: 30 }, // Time limit in seconds
