@@ -208,7 +208,23 @@ router.post('/questions/upload-csv', authenticate, upload.single('questions'), a
 
         // 3. Create questions in the database
         const createdQuestions = await QuestionModel.insertMany(questions);
-
+        const uploadDir = path.join(__dirname, '../uploads');
+        fs.readdir(uploadDir, (err, files) => {
+            if (err) {
+                console.error('Error reading uploads directory:', err);
+                // Optionally, handle the error (e.g., send an error response)
+                return;
+            }
+            for (const file of files) {
+                fs.unlink(path.join(uploadDir, file), (err) => {
+                    if (err) {
+                        console.error(`Error deleting file ${file}:`, err);
+                        // Optionally, handle the error for each file deletion
+                    }
+                });
+            }
+            console.log('Uploads directory cleared successfully.');
+        });
         res.status(201).json({
             message: 'Questions uploaded successfully',
             count: createdQuestions.length,
