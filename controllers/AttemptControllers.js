@@ -10,10 +10,17 @@ const Question = require('../models/Question');
 exports.getAllAvailableTests = async (req, res) => {
     try {
         const now = new Date();
+        const studentId = req.user.id;
         const tests = await Test.find({
             startDate: { $lte: now },
-            endDate: { $gte: now }
-        }).select('-questions'); // Don't send all questions in the list
+            endDate: { $gte: now },
+            $or: [
+                { visibility: 'public' },
+                { visibility: 'enrolled', allowedStudentIds: studentId },
+                { visibility: 'code', allowedStudentIds: studentId }
+            ]
+        })
+        .populate('teacherId', 'username'); // Populate teacher username
         res.status(200).json(tests);
     } catch (error) {
         console.error(error);
@@ -128,21 +135,118 @@ exports.getStudentAttempts = async (req, res) => {
 // @desc    Get a specific attempt of the logged-in student by ID
 // @route   GET /api/students/attempts/:attemptId
 // @access  Private (Students only)
+// exports.getStudentAttemptById = async (req, res) => {
+//     try {
+//         console.log('Fetching attempt with ID:', req.params.attemptId);
+        
+//         // First, get the attempt and populate the test
+//         const attempt = await Attempt.findOne({ 
+//             _id: req.params.attemptId, 
+//             studentId: req.user.id 
+//         }).populate('testId');
+
+//         if (!attempt) {
+//             return res.status(404).json({ message: 'Attempt not found' });
+//         }
+
+//         // Then, populate the questions separately
+//         await Test.populate(attempt.testId, {
+//             path: 'questions',
+//             model: 'Question',
+//             select: 'questionText options correctAnswer topic difficulty'
+//         });
+
+//         // Populate the answers
+//         await Attempt.populate(attempt, {
+//             path: 'answers.questionId',
+//             model: 'Question',
+//             select: 'questionText options correctAnswer'
+//         });
+
+//         // Debug logs
+//         console.log('Found attempt:', attempt._id);
+//         console.log('Test ID:', attempt.testId._id);
+//         console.log('Test title:', attempt.testId.title);
+//         console.log('Questions array length:', attempt.testId.questions ? attempt.testId.questions.length : 0);
+//         console.log('Question IDs:', attempt.testId.questions.map(q => q._id));
+        
+//         // Verify each question exists
+//         const missingQuestions = attempt.testId.questions.filter(q => !q.questionText);
+//         if (missingQuestions.length > 0) {
+//             console.log('Warning: Some questions could not be populated:', missingQuestions.map(q => q._id));
+//         }
+
+//         // Check if test exists but has no questions
+//         if (!attempt.testId.questions || attempt.testId.questions.length === 0) {
+//             console.log('Warning: Test has no questions');
+//             return res.status(400).json({ 
+//                 message: 'This test has no questions assigned to it. Please contact your teacher.',
+//                 attempt: attempt 
+//             });
+//         }
+
+//         res.status(200).json(attempt);
+//     } catch (error) {
+//         console.error('Error in getStudentAttemptById:', error);
+//         res.status(500).json({ message: 'Failed to fetch attempt details' });
+//     }
+// };
 exports.getStudentAttemptById = async (req, res) => {
     try {
-        const attempt = await Attempt.findOne({ _id: req.params.attemptId, studentId: req.user.id })
-            .populate('testId', 'title')
-            .populate({
-                path: 'answers.questionId',
-                model: 'Question',
-                select: 'questionText options correctAnswer' // Optionally include correct answer for review
-            });
+        console.log('Fetching attempt with ID:', req.params.attemptId);
+
+        const attempt = await Attempt.findOne({
+            _id: req.params.attemptId,
+            studentId: req.user.id
+        }).populate('testId');
+
         if (!attempt) {
             return res.status(404).json({ message: 'Attempt not found' });
         }
+
+        // Explicitly populate the questions for the test
+        await Test.populate(attempt.testId, {
+            path: 'questions',
+            model: 'QuestionModel',
+            select: 'questionText options correctAnswer topic difficulty'
+        });
+
+        // Explicitly populate the answers for the attempt
+        await Attempt.populate(attempt, {
+            path: 'answers.questionId',
+            model: 'QuestionModel',
+            select: 'questionText options correctAnswer'
+        });
+
+        // Debug logs
+        console.log('Found attempt:', attempt._id);
+        console.log('Test ID:', attempt.testId._id);
+        console.log('Test title:', attempt.testId.title);
+        console.log('Questions array length:', attempt.testId.questions ? attempt.testId.questions.length : 0);
+        if (attempt.testId.questions) {
+            console.log('Question IDs:', attempt.testId.questions.map(q => q._id));
+        }
+
+        // Verify each question exists
+        if (attempt.testId.questions) {
+            const missingQuestions = attempt.testId.questions.filter(q => !q.questionText);
+            if (missingQuestions.length > 0) {
+                console.log('Warning: Some questions could not be fully populated:', missingQuestions.map(q => q._id));
+            }
+        }
+
+        // Check if test exists but has no questions (after population)
+        if (!attempt.testId.questions || attempt.testId.questions.length === 0) {
+            console.log('Warning: Test has no questions');
+            return res.status(400).json({
+                message: 'This test has no questions assigned to it. Please contact your teacher.',
+                attempt: attempt
+            });
+        }
+
         res.status(200).json(attempt);
     } catch (error) {
-        console.error(error);
+        console.error('Error in getStudentAttemptById:', error);
         res.status(500).json({ message: 'Failed to fetch attempt details' });
     }
 };
@@ -182,5 +286,31 @@ exports.getAttemptDetails = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to fetch attempt details' });
+    }
+};
+
+// @desc    Join a test by code
+// @route   POST /api/students/tests/join
+// @access  Private (Students only)
+exports.joinTestByCode = async (req, res) => {
+    try {
+        const { code } = req.body;
+        const studentId = req.user.id;
+        // Find the test with the given join code and visibility 'code'
+        const test = await Test.findOne({ joinCode: code, visibility: 'code' });
+        if (!test) {
+            return res.status(404).json({ message: 'Invalid or expired join code' });
+        }
+        // Check if student is already enrolled
+        if (test.allowedStudentIds.includes(studentId)) {
+            return res.status(200).json({ message: 'Already joined this test' });
+        }
+        // Add student to allowedStudentIds
+        test.allowedStudentIds.push(studentId);
+        await test.save();
+        res.status(200).json({ message: 'Joined test successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to join test by code' });
     }
 };

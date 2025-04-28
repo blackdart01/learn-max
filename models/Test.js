@@ -9,6 +9,9 @@ const testSchema = new mongoose.Schema({
     duration: { type: Number, default: 60 }, // Test duration in minutes
     startDate: { type: Date },
     endDate: { type: Date },
+    visibility: { type: String, default: "enrolled" }, // 'public' | 'enrolled' | 'code'
+    joinCode: { type: String }, // only if visibility === 'code'
+    allowedStudentIds: [String], // for enrolled students
     // ... other test configurations
 }, { timestamps: true });
 

@@ -80,7 +80,7 @@ exports.getAllTestsByTeacher = async (req, res) => {
 // @access  Private (Teachers only)
 exports.createTest = async (req, res) => {
     try {
-        const { title, description, duration, startDate, endDate, questions } = req.body;
+        const { title, description, duration, startDate, endDate, questions, visibility, joinCode, allowedStudentIds } = req.body;
         const newTest = new Test({
             teacherId: req.user.id,
             title,
@@ -88,7 +88,10 @@ exports.createTest = async (req, res) => {
             duration,
             startDate,
             endDate,
-            questions: questions || []
+            questions: questions || [],
+            visibility: visibility || "enrolled",
+            joinCode : joinCode || "",
+            allowedStudentIds: allowedStudentIds || [],
         });
         const savedTest = await newTest.save();
         res.status(201).json(savedTest);
@@ -119,10 +122,10 @@ exports.getTestByIdForTeacher = async (req, res) => {
 // @access  Private (Teachers only)
 exports.updateTest = async (req, res) => {
     try {
-        const { title, description, duration, startDate, endDate, questions } = req.body;
+        const { title, description, duration, startDate, endDate, questions, visibility, joinCode, allowedStudentIds } = req.body;
         const updatedTest = await Test.findOneAndUpdate(
             { _id: req.params.id, teacherId: req.user.id },
-            { title, description, duration, startDate, endDate, questions },
+            { title, description, duration, startDate, endDate, questions, visibility, joinCode, allowedStudentIds },
             { new: true, runValidators: true }
         ).populate('questions');
         if (!updatedTest) {

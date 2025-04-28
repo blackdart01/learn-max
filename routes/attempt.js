@@ -29,6 +29,7 @@ router.get('/students/tests', attemptController.getAllAvailableTests);
 router.get('/students/tests/:testId', attemptController.getTestByIdForStudent);
 router.post('/students/tests/:testId/start', attemptController.startTest);
 router.post('/students/tests/:testId/submit', attemptController.submitTest);
+router.post('/students/join-test-by-code', attemptController.joinTestByCode);
 router.get('/students/attempts', attemptController.getStudentAttempts);
 router.get('/students/attempts/:attemptId', attemptController.getStudentAttemptById);
 
