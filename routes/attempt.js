@@ -40,4 +40,9 @@ router.use('/teachers', requireTeacher);
 router.get('/teachers/attempts/:testId', attemptController.getAttemptsByTest);
 router.get('/teachers/attempts/:attemptId', attemptController.getAttemptDetails);
 
+
+// Progress saving and retrieval routes
+router.post('/students/attempts/:attemptId/progress', attemptController.saveTestProgress);
+router.get('/students/attempts/:attemptId/progress', attemptController.getTestProgress);
+
 module.exports = router;
