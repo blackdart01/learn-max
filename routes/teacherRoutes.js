@@ -12,6 +12,8 @@ const { v4: uuidv4 } = require('uuid'); // For generating unique filenames
 const { fromPath } = require('pdf2pic');
 const Tesseract = require('tesseract.js');
 const pdfParse = require('pdf-parse');
+const enrollmentController = require('../controllers/enrollmentController');
+
 
 // Middleware to handle file uploads (using multer)
 const isExcelFile = (file) => {
@@ -435,6 +437,10 @@ const requireTeacher = (req, res, next) => {
 };
 
 
+// Enrollment routes
+router.get('/enrolled-students', authenticate, enrollmentController.getEnrolledStudents);
+router.post('/enroll-students', authenticate, enrollmentController.enrollStudents);
+router.post('/remove-students', authenticate, enrollmentController.removeEnrolledStudents);
 
 // Apply authentication middleware to all teacher routes
 router.use(authMiddleware.authenticate);

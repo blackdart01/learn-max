@@ -2,7 +2,7 @@
 
 const Attempt = require('../models/Attempt');
 const Test = require('../models/Test');
-const Question = require('../models/Question');
+const Question = require('../models/QuestionModel');
 
 // @desc    Get all available tests for students
 // @route   GET /api/students/tests
@@ -83,47 +83,133 @@ exports.startTest = async (req, res) => {
 // @desc    Submit answers for a test
 // @route   POST /api/students/tests/:testId/submit
 // @access  Private (Students only)
+// exports.submitTest = async (req, res) => {
+//     try {
+//         const { answers } = req.body; // Array of { questionId, selectedOption }
+//         const testId = req.params.testId;
+//         const studentId = req.user.id;
+
+//         const test = await Test.findById(testId).populate('questions', 'correctAnswer');
+//         if (!test) {
+//             return res.status(404).json({ message: 'Test not found' });
+//         }
+
+//         const attempt = await Attempt.findOne({ studentId, testId, endTime: null });
+//         if (!attempt) {
+//             return res.status(400).json({ message: 'Test not started or already submitted' });
+//         }
+
+//         // Calculate score as a percentage
+//         let correctAnswers = 0;
+//         const totalQuestions = test.questions.length;
+
+//         for (const submittedAnswer of answers) {
+//             const question = test.questions.find(q => q._id.toString() === submittedAnswer.questionId);
+//             if (question && submittedAnswer.selectedOption.toString() === question.correctAnswer.toString()) {
+//                 correctAnswers++;
+//             }
+//         }
+
+//         // Calculate score as a percentage
+//         const scorePercentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
+//         attempt.answers = answers;
+//         attempt.score = scorePercentage;
+//         attempt.endTime = new Date();
+//         const updatedAttempt = await attempt.save();
+
+//         res.status(200).json({ message: 'Test submitted successfully', score: updatedAttempt.score });
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ message: 'Failed to submit test' });
+//     }
+// }; 
+
 exports.submitTest = async (req, res) => {
     try {
         const { answers } = req.body; // Array of { questionId, selectedOption }
         const testId = req.params.testId;
         const studentId = req.user.id;
 
-        const test = await Test.findById(testId).populate('questions', 'correctAnswer');
+        // Get test with fully populated questions
+        const test = await Test.findById(testId);
         if (!test) {
             return res.status(404).json({ message: 'Test not found' });
         }
+
+        // Fetch all questions for this test
+        const questions = await Question.find({
+            _id: { $in: test.questions }
+        });
+
+        if (!questions || questions.length === 0) {
+            return res.status(400).json({ message: 'No questions found for this test' });
+        }
+
+        console.log('Found questions:', questions.map(q => ({
+            id: q._id,
+            correctAnswer: q.correctAnswer
+        })));
 
         const attempt = await Attempt.findOne({ studentId, testId, endTime: null });
         if (!attempt) {
             return res.status(400).json({ message: 'Test not started or already submitted' });
         }
 
-        // Calculate score as a percentage
-        let correctAnswers = 0;
-        const totalQuestions = test.questions.length;
+        // Calculate score
+        let score = 0;
+        let totalQuestions = questions.length;
+
+        console.log('Calculating score...');
+        console.log('Total questions:', totalQuestions);
+        console.log('Submitted answers:', JSON.stringify(answers, null, 2));
 
         for (const submittedAnswer of answers) {
-            const question = test.questions.find(q => q._id.toString() === submittedAnswer.questionId);
-            if (question && submittedAnswer.selectedOption.toString() === question.correctAnswer.toString()) {
-                correctAnswers++;
+            console.log("submittedAnswer", submittedAnswer);
+            const question = questions.find(q => q._id.toString() === submittedAnswer.questionId);
+
+            if (question) {
+                // Convert both answers to strings and trim whitespace for comparison
+                const submittedOption = String(submittedAnswer.selectedOption || '').trim().toLowerCase();
+                const correctOption = String(question.correctAnswer || '').trim().toLowerCase();
+
+                console.log(`Comparing answers for question ${question._id}:`);
+                console.log('Submitted:', submittedOption);
+                console.log('Correct:', correctOption);
+
+                if (submittedOption === correctOption) {
+                    score++;
+                    console.log('✓ Correct answer! Current score:', score);
+                } else {
+                    console.log('✗ Incorrect answer');
+                }
+            } else {
+                console.log(`Warning: Question not found for ID ${submittedAnswer.questionId}`);
             }
         }
 
-        // Calculate score as a percentage
-        const scorePercentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+        // Calculate percentage score (ensure we don't divide by zero)
+        const percentageScore = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
+        console.log('Final percentage score:', percentageScore + '%');
 
+        // Update attempt with answers and score
         attempt.answers = answers;
-        attempt.score = scorePercentage;
+        attempt.score = percentageScore;
         attempt.endTime = new Date();
+
         const updatedAttempt = await attempt.save();
 
-        res.status(200).json({ message: 'Test submitted successfully', score: updatedAttempt.score });
+        res.status(200).json({
+            message: 'Test submitted successfully',
+            score: updatedAttempt.score,
+            totalQuestions,
+            correctAnswers: score
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to submit test' });
+        console.error('Error in submitTest:', error);
+        res.status(500).json({ message: 'Failed to submit test', error: error.message });
     }
-}; 
+};
 
 // @desc    Get all attempts of the logged-in student
 // @route   GET /api/students/attempts

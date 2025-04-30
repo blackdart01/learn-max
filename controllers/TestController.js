@@ -412,3 +412,31 @@ exports.removeQuestionFromTest = async (req, res) => {
         res.status(500).json({ message: 'Failed to remove question from test' });
     }
 };
+
+
+// Get all available tests for students
+exports.getAvailableTests = async (req, res) => {
+    try {
+        const currentDate = new Date();
+        const studentId = req.user.id;
+
+        // Find tests that are either:
+        // 1. Public visibility OR
+        // 2. Enrolled visibility AND student is in allowedStudentIds
+        const tests = await Test.find({
+            $or: [
+                { visibility: 'public' },
+                {
+                    visibility: 'enrolled',
+                    allowedStudentIds: studentId
+                }
+            ],
+            startDate: { $lte: currentDate },
+            endDate: { $gt: currentDate }
+        }).populate('questions', 'question options');
+
+        res.json(tests);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching tests', error: error.message });
+    }
+};
