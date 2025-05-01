@@ -212,7 +212,14 @@ exports.getOpenAi = async (req, res) => {
         if (!parsedObject) {
             return res.status(404).json({ message: 'No data extracted from PDF' });
         } else {
-            uploadedScannedQuestion = await addScannedQuestions(parsedObject, req.user.id)
+            let newParsedObject = [];
+            for (let obj of parsedObject){
+                if(obj.options.length<=0){
+                    obj.questionType = 'Fill-In-The-Blank';
+                }
+                newParsedObject.push(obj);
+            }
+            uploadedScannedQuestion = await addScannedQuestions(newParsedObject, req.user.id)
         }
 
         if (!uploadedScannedQuestion){
