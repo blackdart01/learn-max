@@ -137,6 +137,7 @@ async function addScannedQuestions(questionsData, userId) {
             questionText: questionData.questionText,
             options: questionData.options,
             correctAnswer: questionData.correctAnswer,
+            questionType: questionData.questionType
             // Add other fields as needed
         }));
 
@@ -214,7 +215,9 @@ exports.getOpenAi = async (req, res) => {
         } else {
             let newParsedObject = [];
             for (let obj of parsedObject){
-                if(obj.options.length<=0){
+                // console.log("obj.options -> ", JSON.stringify(obj));
+                
+                if(obj && !obj.options || obj.options.length<=0){                    
                     obj.questionType = 'Fill-In-The-Blank';
                 }
                 newParsedObject.push(obj);
