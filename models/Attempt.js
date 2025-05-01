@@ -6,7 +6,9 @@ const attemptSchema = new mongoose.Schema({
     testId: { type: mongoose.Schema.Types.ObjectId, ref: 'Test', required: true },
     answers: [{
         questionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Question', required: true },
-        selectedOption: { type: String }
+        selectedOption: { type: String },
+        isCorrect: {type: Boolean},
+        score: {type : String}
     }],
     score: { type: Number },
     startTime: { type: Date, default: Date.now },

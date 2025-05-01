@@ -123,11 +123,15 @@ exports.getTestByIdForTeacher = async (req, res) => {
 exports.updateTest = async (req, res) => {
     try {
         const { title, description, duration, startDate, endDate, questions, visibility, joinCode, allowedStudentIds } = req.body;
+        console.log(req.body);
+        
         const updatedTest = await Test.findOneAndUpdate(
             { _id: req.params.id, teacherId: req.user.id },
             { title, description, duration, startDate, endDate, questions, visibility, joinCode, allowedStudentIds },
             { new: true, runValidators: true }
-        ).populate('questions');
+        );
+        console.log("updatedTest -> ", updatedTest);
+        
         if (!updatedTest) {
             return res.status(404).json({ message: 'Test not found or you are not the creator' });
         }

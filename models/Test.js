@@ -12,6 +12,9 @@ const testSchema = new mongoose.Schema({
     visibility: { type: String, default: "enrolled" }, // 'public' | 'enrolled' | 'code'
     joinCode: { type: String }, // only if visibility === 'code'
     allowedStudentIds: [String], // for enrolled students
+    correctAnswerMark: {type: String, default: "1"},
+    incorrectAnswerMark: {type: String, default: "0"},
+    unattemptedAnswerMark: { type: String, default: "0" },
     // ... other test configurations
 }, { timestamps: true });
 
